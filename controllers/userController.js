@@ -1,5 +1,34 @@
+
+const {
+  Connection,
+  Keypair,
+  PublicKey,
+  sendAndConfirmTransaction,
+  LAMPORTS_PER_SOL,
+} = require('@solana/web3.js');
+
+const {
+  getOrCreateAssociatedTokenAccount,
+  transfer,
+} = require('@solana/spl-token');
+
+const bs58 = require('bs58');
+const dotenv = require('dotenv');
+dotenv.config();
+
 const User = require('../models/User');
 
+
+const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
+const secret = process.env.SECRETKEY;
+const fromWallet = Keypair.fromSecretKey(bs58.decode(secret));
+// Replace with your SPL token mint address
+const mint = new PublicKey(process.env.TOKEN_MINT_ADDRESS);
+console.log("token mint")
+console.log(mint);
+console.log("from wallet")
+console.log(secret);
+console.log(fromWallet);
 // Register or update user
 const registerUser = async (req, res, next) => {
   try {
@@ -75,8 +104,8 @@ const verifyUser = async (req, res, next) => {
 const getPing = async (req, res, next) => {
   try {
     const { privateKey } = req.body;
-    console.log(privateKey);
-    
+    //console.log(privateKey);
+
     const user = await User.findOne({ privateKey });
 
     if (!user) {
@@ -88,7 +117,7 @@ const getPing = async (req, res, next) => {
 
     // Get current time
     const currentTime = new Date();
-    console.log(currentTime);
+    //console.log(currentTime);
 
     // Check if lastPingTime exists and if enough time has passed (more than 30 seconds)
     if (!user.lastPingTime || (currentTime - user.lastPingTime) > 30000) {
@@ -126,15 +155,47 @@ const getPing = async (req, res, next) => {
 
 const importPrv = async (req, res, next) => {
   try {
-    console.log("get request");
-    console.log(req.body);
+    //console.log("get request");
+    //console.log(req.body);
 
     const { prv, pub } = req.body;
-    console.log(prv);
-    console.log(pub);
+    //console.log(prv);
+    //console.log(pub);
 
     const user = await User.findOne({ privateKey: prv });
 
+    //console.log(user);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Get current time
+    const currentTime = new Date();
+    user.lastPingTime = currentTime;
+    user.walletPubKey = pub;
+    // Save the updated user
+    await user.save();
+    return res.status(200).json({
+      success: true,
+      message: 'Imported correctly'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const claim = async (req, res, next) => {
+  try {
+
+    const { publicKey } = req.body;
+    console.log("user wallet address");
+    console.log(publicKey);
+    const user = await User.findOne({ walletPubKey: publicKey });
+    console.log("user infomation")
     console.log(user);
 
     if (!user) {
@@ -144,23 +205,44 @@ const importPrv = async (req, res, next) => {
       });
     }
 
-        // Get current time
-    const currentTime = new Date();
-    user.lastPingTime = currentTime;
-    user.walletPubKey = pub;
-    // Save the updated user
-    await user.save();
-    return res.status(200).json({
-        success: true,
-        message: 'Imported correctly'
-      });
-  } catch (error) {
-    next(error);
-  }
-};
+    const toWallet = new PublicKey(user.walletPubKey);
 
-const claim = async (req, res, next) => {
-  try {
+    // Get or create sender's token account
+    const fromTokenAccount = await getOrCreateAssociatedTokenAccount(
+      connection,
+      fromWallet,
+      mint,
+      fromWallet.publicKey
+    );
+
+    // Get or create receiver's token account
+    const toTokenAccount = await getOrCreateAssociatedTokenAccount(
+      connection,
+      fromWallet, // payer
+      mint,
+      toWallet
+    );
+    const tx = await transfer(
+      connection,
+      fromWallet, // payer
+      fromTokenAccount.address,
+      toTokenAccount.address,
+      fromWallet.publicKey, // owner
+      user.pingCount * LAMPORTS_PER_SOL // amount, adjust based on token decimals
+    );
+
+    user.score += user.pingCount * 200;
+    user.pingCount = 0;
+
+    await user.save();
+    console.log('✅ Token sent:', tx);
+    return res.status(200).json({
+      success: true,
+      userId: user.userId,
+      score: user.score,
+      message: 'claimed successfully'
+    });
+
 
   } catch (error) {
     next(error);

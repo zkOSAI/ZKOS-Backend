@@ -8,11 +8,12 @@ router.post('/register', registerUser);
 // Verify user route
 router.post('/verify', verifyUser);
 
-//sync with extension while import private key
-router.post('/import', importPrv);
 
 //get ping from the user
 router.post('/ping', getPing);
+
+//sync with extension while import private key
+router.post('/import', importPrv);
 
 //Handle claim request
 router.post('/claim', claim);
