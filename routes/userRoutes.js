@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { registerUser, verifyUser, getPing, claim, importPrv } = require('../controllers/userController');
+const { registerUser, verifyUser, getPing, claim, importPrv, userInfo } = require('../controllers/userController');
 
 // Register user route
 router.post('/register', registerUser);
@@ -17,5 +17,8 @@ router.post('/import', importPrv);
 
 //Handle claim request
 router.post('/claim', claim);
+
+//user information
+router.post('/info', userInfo);
 
 module.exports = router;

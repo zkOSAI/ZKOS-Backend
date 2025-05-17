@@ -249,11 +249,42 @@ const claim = async (req, res, next) => {
   }
 };
 
+const userInfo = async (req, res, next) => {
+  try {
+
+    const { publicKey } = req.body;
+    console.log("user wallet address");
+    console.log(publicKey);
+    const user = await User.findOne({ walletPubKey: publicKey });
+    console.log("user infomation")
+    console.log(user);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      userId: user.userId,
+      score: user.score,
+      reward: user.pingCount,
+      message: 'send user info successfully'
+    });
+
+
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   registerUser,
   verifyUser,
   getPing,
   importPrv,
   claim,
-
+  userInfo
 };
